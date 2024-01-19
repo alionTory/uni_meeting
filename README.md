@@ -77,7 +77,7 @@ create sequence seq_comment nocache;
 ```
 
 
-## 환경변수 설정
+## OS 환경변수 설정
 1. UNI_MEETING_DB_USERNAME : mariaDB의 username
 2. UNI_MEETING_DB_PASSWORD : mariaDB의 password
 3. KAKAO_REST : kakao developers 에서 받은 REST API 키
