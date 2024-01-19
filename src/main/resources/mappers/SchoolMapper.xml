@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.aliontory.uni_meeting.mapper.SchoolMapper">
+    <select id="getList" resultType="schoolVO">
+        SELECT * FROM TBL_SCHOOL
+    </select>
+    <select id="get" resultType="schoolVO">
+        SELECT * FROM TBL_SCHOOL
+        WHERE SCHOOL_ID = #{school_id}
+    </select>
+    <select id="getIdList" resultType="String">
+        SELECT SCHOOL_ID FROM TBL_SCHOOL
+    </select>
+</mapper>

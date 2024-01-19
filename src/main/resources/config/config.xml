@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <typeAliases>
+        <typeAlias alias="boardVO" type="io.github.aliontory.uni_meeting.beans.vo.BoardVO"></typeAlias>
+        <typeAlias alias="memberDTO" type="io.github.aliontory.uni_meeting.security.MemberSecurityDTO"></typeAlias>
+        <typeAlias alias="schoolVO" type="io.github.aliontory.uni_meeting.beans.vo.SchoolVO"></typeAlias>
+        <typeAlias alias="commentVO" type="io.github.aliontory.uni_meeting.beans.vo.CommentVO"></typeAlias>
+    </typeAliases>
+</configuration>

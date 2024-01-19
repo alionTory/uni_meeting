@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        #title {
+            border-width: 1px 0;
+            box-shadow: none;
+            border-radius: 0;
+        }
+
+        #writePost {
+            padding: 0 20px;
+            margin-top: 10px;
+        }
+
+        #content {
+            border-width: 1px 0;
+            box-shadow: none;
+            border-radius: 0;
+            margin-bottom: 10px;
+        }
+
+        #cancel {
+            margin-right: 5%;
+        }
+
+        #register {
+            margin-left: 5%;
+        }
+    </style>
+</head>
+<body>
+<nav class="bg-white shadow-sm sticky-top d-flex justify-content-around" id="topBar" style="padding:10px 0;">
+    <button class="btn btn-lg btn-outline-secondary align-self-center" type="button"
+            onclick="location.href='../../../main'">
+        <i class="bi bi-house-fill"></i>
+    </button>
+    <a href="./list" class="btn"><h1 class="ms-0" th:text="${boardTitle}"></h1></a>
+    <button class="btn btn-outline-danger btn-lg align-self-center"><i class="bi bi-bell"></i></button>
+</nav>
+
+<div id="writePost" class="col-lg-6 mx-auto">
+    <div class="d-flex justify-content-center">
+        <button class="btn btn-danger" id="addLocationButton">모임 위치 첨부</button>
+    </div>
+
+    <div id="location" class="d-flex flex-column align-items-center d-none">
+        <div class="d-flex justify-content-evenly align-self-stretch mt-2 gap-2">
+            <div class="d-flex gap-2">
+                <input name="locationKeyword" type="search" placeholder="주소 또는 장소명 입력">
+                <button class="btn btn-dark" id="searchLocation"><i class="bi bi-search"></i></button>
+            </div>
+            <ul id="searchedListPage" class="pagination mb-0">
+                <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
+                <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
+            </ul>
+        </div>
+        <div class="list-group align-self-stretch mt-2" id="searchResult"></div>
+        <div id="kakaoMap" class="mt-2" style="width: 500px; height: 400px"></div>
+    </div>
+
+    <br>
+    <form id="postForm" method="post" action="">
+        <div class="form-floating">
+            <input name="title" id="title" class="form-control" type="text" placeholder="글 제목"
+                   th:value="${boardVO.title}">
+            <label for="title">글 제목</label>
+        </div>
+
+        <div class="form-floating">
+            <textarea name="content" id="content" class="form-control" placeholder="내용"
+                      style="overflow: hidden"
+                      th:text="${boardVO.content}"></textarea>
+            <label for="content">내용</label>
+        </div>
+        <input type="hidden" name="placeId">
+        <div class="d-flex">
+            <button class="btn btn-secondary flex-fill" id="cancel">취소</button>
+            <input type="submit" value="등록" class="btn btn-danger flex-fill" id="register">
+        </div>
+    </form>
+</div>
+<div id="bottomBar" class="col-lg-6 mx-auto" style="height: 100px">
+    <hr>
+</div>
+
+</body>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+<script type="text/javascript" th:src="'//dapi.kakao.com/v2/maps/sdk.js?appkey='+${@environment.getProperty('kakao.javascript')}+'&libraries=services'"></script>
+<script th:inline="javascript">
+    $(function () {
+        // =====textarea 크기 자동 조절 기능=====
+        const textarea = $("textarea");
+        textarea.css('height', textarea.prop('scrollHeight') + 'px');
+        $(document).on("input", "textarea", function () {
+            let cloned = $(this).data("cloned");
+            if (!cloned) {
+                cloned = $(this).clone();
+                $(this).data("cloned", cloned);
+
+                cloned.css("visibility", "hidden");
+                cloned.css("position", "fixed");
+                cloned.css("height", "0px");
+                cloned.css("width", $(this).css("width"));
+                cloned.css("line-height", $(this).css("line-height"));
+                cloned.css("padding", $(this).css("padding"));
+
+                cloned.appendTo("body");
+            }
+
+            cloned.val(this.value);
+            let computedHeight = cloned.prop("scrollHeight");
+            this.style.height = computedHeight + 'px';
+        });
+        /* textarea를 복제하여 사용하는 이유
+         복제해서 scrollHeight값을 가져오지 않으면
+         textarea 크기가 증가만 되고 줄어들지 않는다.
+         this.style.height = "auto" 를 먼저 실행한뒤 크기를 조절하면 줄어들지만
+         브라우저 전체 스크롤이 지멋대로 바뀌는 현상이 일어남. 따라서 복제해서 사용하는 게 좋음.
+         */
+
+        // 브라우저 창 크기가 바뀌면 textarea내 문자열의 줄이 바뀔 수 있다.
+        // 이에 대한 처리 필요
+        $(window).resize(function () {
+            $("textarea").each(function (index, item) {
+                let cloned = $(item).data("cloned");
+                if (cloned) {
+                    cloned.css("width", $(item).css("width"));
+                    item.style.height = cloned.get(0).scrollHeight + 'px';
+                }
+            });
+        });
+        //=======================================================
+
+
+        $("#cancel").on("click", function (e) {
+            e.preventDefault();
+            if (confirm("글 작성을 취소하시겠습니까?")) {
+                location.href = "../list";
+            }
+        });
+
+        $("#register").on("click", function (e) {
+            e.preventDefault();
+
+            let title = $("#title").val();
+            let content = $("#content").val();
+
+            if (!title?.trim())
+                alert("제목을 작성해 주세요");
+            else if (!content?.trim())
+                alert("내용을 작성해 주세요");
+            else if(title.length>200)
+                alert("제목은 200자 이하여야 합니다.");
+            else if(content.length>2000)
+                alert("내용은 2000자 이하여야 합니다.")
+            else
+                $("#postForm").submit();
+        });
+
+
+
+        const locationDiv = $("#location");
+
+        // 페이징 처리에 쓰이는 html 요소들
+        const searchedListPage = $("#searchedListPage");
+        const prev = searchedListPage.children().eq(0);
+        const next = searchedListPage.children().eq(1);
+
+        // 좌표 객체 생성. 초깃값은 서울역으로.
+        let userLatLng = new kakao.maps.LatLng(37.5546788388674, 126.970606917394);
+
+        // 카카오 지도 띄우기
+        const container = document.getElementById('kakaoMap'); //지도를 담을 영역의 DOM 레퍼런스
+        let map = new kakao.maps.Map(container, {
+            level: 3,
+            center: userLatLng
+        });
+
+        // 키워드 검색용 객체 생성
+        let ps = new kakao.maps.services.Places();
+
+        // 마커 생성
+        let marker = new kakao.maps.Marker();
+        marker.setMap(map);
+
+        // 지도 중심을 사용자 위치로 설정
+        navigator.geolocation.getCurrentPosition((position) => {
+            let userLat = position.coords.latitude;
+            let userLon = position.coords.longitude;
+            userLatLng = new kakao.maps.LatLng(userLat, userLon);
+
+            map.setCenter(userLatLng);
+        });
+
+
+        //*****기존 위치 데이터 확인하기*****
+        function getPlace(placeId, callback, error) {
+            $.ajax({
+                type: "GET",
+                url: "/getPlace/" + placeId,
+                contentType: "application/json; charset=utf-8",
+                success: callback,
+                error: error
+            });
+        }
+
+        let placeId = [[${boardVO.placeId}]];
+        console.log(placeId);
+        if (placeId) {  // placeId가 존재하는 경우만 실행
+            locationDiv.removeClass("d-none");
+            $("#addLocationButton").html("위치 첨부 취소");
+            map.relayout();
+
+            getPlace(placeId, function (placeVO) {
+                let coords = new kakao.maps.Coords(placeVO.x, placeVO.y);
+                let latLng = coords.toLatLng();
+                map.setCenter(latLng);
+                marker.setPosition(latLng);
+
+                $("input[name='placeId']").val(placeId);
+            });
+        }
+        //*****기존 위치 데이터 확인 완료*****
+
+        // 위치 첨부 버튼을 눌렀을 경우 실행
+        $("#addLocationButton").click(function (event) {
+            let addLocationButton = $(this);
+            if (locationDiv.hasClass("d-none")) {
+                locationDiv.removeClass("d-none");
+                $(this).html("위치 첨부 취소");
+
+                // 지도 크기가 변경되거나 display: none이 해제되는 경우 relayout()을 실행해야 함
+                if (map)
+                    map.relayout();
+            } else {
+                if (confirm("위치 첨부를 취소하시겠습니까?")) {
+                    locationDiv.addClass("d-none");
+                    addLocationButton.html("모임 위치 첨부");
+
+                    $("input[name='placeId']").val(null);
+                    $("input[name='locationKeyword']").val(null);
+                    $("#searchResult").html(null);
+
+                    marker.setVisible(false);
+
+                    prev.addClass("disabled");
+                    prev.off("click");
+                    next.addClass("disabled");
+                    next.off("click");
+                }
+            }
+        });
+
+        // 위치 검색 버튼을 눌렀을 경우
+        $("#searchLocation").click(function (event) {
+            let keyword = $("input[name='locationKeyword']").val();
+            ps.keywordSearch(keyword, searchCallback, {location: userLatLng, size: 10});
+        });
+
+        function searchCallback(data, status, pagination) {
+            if (status === kakao.maps.services.Status.OK) {
+                printSearchedLocation(data);
+                displayPagination(pagination);
+            } else if (status === kakao.maps.services.Status.ZERO_RESULT) {
+                alert('검색 결과가 존재하지 않습니다.');
+                return;
+            } else if (status === kakao.maps.services.Status.ERROR) {
+                alert('검색 결과 중 오류가 발생했습니다.');
+                return;
+            }
+        }
+
+        function printSearchedLocation(places) {
+            str = "";
+            for (let place of places) {
+                str += getLocationElement(place);
+            }
+            $("#searchResult").html(str);
+        }
+
+        // 장소 하나를 입력하면 그 장소 정보가 입력된 html요소를 반환
+        function getLocationElement(place) {
+            let str = "";
+            str += `<button class="list-group-item">
+                        <b>${place.place_name}</b>`;
+            if (place.road_address_name) {
+                str += `<div>${place.road_address_name}</div>`;
+                str += `<div><span style="color:#808080">지번 : </span>${place.address_name}</div>`;
+            } else {
+                str += `<div>${place.address_name}</div>`;
+            }
+            str += `    <input type="hidden" name="placeIdCandidate" value="${place.id}">
+                        <input type="hidden" name="x" value="${place.x}">
+                        <input type="hidden" name="y" value="${place.y}">
+                    </button>`;
+            return str;
+        }
+
+        // 검색 결과 페이징 처리
+        function displayPagination(pagenation) {
+            if (pagenation.hasPrevPage == prev.hasClass("disabled"))
+                prev.toggleClass("disabled");
+            if (pagenation.hasNextPage == next.hasClass("disabled"))
+                next.toggleClass("disabled");
+
+            prev.off("click");
+            prev.click(function () {
+                if (pagenation.hasPrevPage)
+                    pagenation.prevPage();
+            });
+            next.off("click");
+            next.click(function () {
+                if (pagenation.hasNextPage)
+                    pagenation.nextPage();
+            });
+        }
+
+        // 장소 검색 결과 클릭 시 이벤트 등록
+        $("#searchResult").on("click", "button", function () {
+            let placeId = $(this).find("input[name='placeIdCandidate']").first().val();
+            let x = $(this).find("input[name='x']").first().val();
+            let y = $(this).find("input[name='y']").first().val();
+
+            $("input[name='placeId']").val(placeId);
+
+            $("#searchResult>.active").removeClass("active");
+            $(this).addClass("active");
+
+            let selectedLatLng = new kakao.maps.LatLng(y, x);
+            marker.setVisible(true);
+            marker.setPosition(selectedLatLng);
+            map.setCenter(selectedLatLng);
+        });
+    });
+</script>
+</html>

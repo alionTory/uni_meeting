@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        #postSpace {
+            padding: 0px 20px;
+        }
+
+        #postTitle {
+            padding-top: 20px;
+        }
+
+        #writerName {
+        }
+
+        #postContent {
+        }
+
+        #location {
+            text-align: center;
+        }
+
+        #location img {
+            width: 30%;
+        }
+
+        #commentsArea {
+            padding: 0px 20px;
+
+        }
+
+        .isEdited, .isSecret {
+            color: gray;
+            margin-top: 5px;
+        }
+
+        .commentUnit {
+            padding-right: 0;
+        }
+
+        .postReply {
+            padding-left: 5%;
+        }
+
+        textarea {
+            overflow: hidden;
+        }
+
+        .replyTarget {
+            color: gray;
+        }
+    </style>
+</head>
+<body>
+<nav class="bg-white shadow-sm sticky-top d-flex justify-content-around" id="topBar" style="padding:10px 0;">
+    <button class="btn btn-lg btn-outline-secondary align-self-center" type="button"
+            onclick="location.href='../../../main'">
+        <i class="bi bi-house-fill"></i>
+    </button>
+    <a href="../list" class="btn"><h1 class="ms-0" th:text="${boardTitle}"></h1></a>
+    <button class="btn btn-outline-danger btn-lg align-self-center"><i class="bi bi-bell"></i></button>
+</nav>
+
+<div id="postSpace" class="col-lg-6 mx-auto">
+    <div id="postTitle" class="d-flex align-items-center">
+        <h3 class="me-auto" th:text="*{board.title}"></h3>
+        <th:block sec:authorize="principal.mid==#vars.board.mid">
+            <button class="btn btn-sm btn-secondary text-nowrap" style="margin-right: 10px;" onclick="location.href='./modify'">수정
+            </button>
+        </th:block>
+        <th:block sec:authorize="hasRole('ADMIN') or principal.mid==#vars.board.mid">
+            <button id="deletePost" class="btn btn-sm btn-secondary text-nowrap">삭제</button>
+        </th:block>
+    </div>
+    <br>
+    <div id="writerName">작성자 : <a href="" th:text="*{board.writerName}"></a></div>
+    <hr>
+
+    <div id="postContent">
+        <div id="location" class="mb-2 mx-auto" style="width: 500px; height: 400px; display: none;"></div>
+        <div th:text="*{board.content}" style="white-space: pre-wrap">
+        </div>
+    </div>
+</div>
+
+<hr class="col-lg-6 mx-auto">
+<div id="commentsArea" class="list-group list-group-flush col-lg-6 mx-auto">
+    <div class="list-group-item writeReply">
+        <form class="d-flex">
+            <textarea class="flex-fill" style="margin-right: 10px"></textarea>
+            <button class="btn btn-danger align-self-start">댓글 입력</button>
+        </form>
+    </div>
+</div>
+<div id="bottomBar" class="col-lg-6 mx-auto" style="height: 100px">
+    <hr>
+</div>
+</body>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+<script src="/js/comment.js"></script>
+<script type="text/javascript" th:src="'//dapi.kakao.com/v2/maps/sdk.js?appkey='+${@environment.getProperty('kakao.javascript')}"></script>
+<script th:inline="javascript">
+    // textarea 크기 조정
+    const DEFAULT_TEXTAREA_HEIGHT = 53.3333;  // textarea 최소 높이
+    const textarea = $("textarea");
+    textarea.css('height', textarea.prop('scrollHeight') + 'px');
+    $(document).on("input", "textarea", function () {
+        let cloned = $(this).data("cloned");
+        if (!cloned) {
+            cloned = $(this).clone();
+            $(this).data("cloned", cloned);
+            cloned.css("position", "fixed");
+            cloned.css("height", "0px");
+            cloned.css("width", $(this).css("width"));
+            cloned.appendTo("body");
+            cloned.css("visibility", "hidden");
+        }
+
+        cloned.val(this.value);
+        let computedHeight = cloned.prop("scrollHeight");
+        if (computedHeight < DEFAULT_TEXTAREA_HEIGHT)
+            computedHeight = DEFAULT_TEXTAREA_HEIGHT;
+        this.style.height = computedHeight + 'px';
+    });
+    /* textarea를 복제하여 사용하는 이유
+     복제해서 scrollHeight값을 가져오지 않으면
+     textarea 크기가 증가만 되고 줄어들지 않는다.
+     this.style.height = "auto" 를 먼저 실행한뒤 크기를 조절하면 줄어들지만
+     브라우저 전체 스크롤이 지멋대로 바뀌는 현상이 일어남. 따라서 복제해서 사용하는 게 좋음.
+     */
+
+
+    // 브라우저 창 크기가 바뀌면 textarea내 문자열의 줄이 바뀔 수 있다.
+    // 이에 대한 처리 필요
+    $(window).resize(function () {
+        $("textarea").each(function (index, item) {
+            let cloned = $(item).data("cloned");
+            if (cloned) {
+                cloned.css("width", $(item).css("width"));
+
+                let computedHeight = cloned.prop("scrollHeight");
+                if (computedHeight < DEFAULT_TEXTAREA_HEIGHT)
+                    computedHeight = DEFAULT_TEXTAREA_HEIGHT;
+
+                item.style.height = computedHeight + 'px';
+            }
+        });
+    });
+
+
+    // 답글창 보이기, 숨기기
+    function toggleWriteReply(replyUnit) {
+        replyUnit.next().toggle();
+
+        // 댓글창 border 조정
+        if (replyUnit.next().next().length == 0) {
+            replyUnit.toggleClass("border-bottom-0");
+        }
+    }
+
+    $("#commentsArea").on("click", ".showWriteReply", function (event) {
+        event.preventDefault();
+        toggleWriteReply($(this).closest(".list-group-item"));
+    });
+
+
+    // 게시글 삭제 전 확인 알림창 띄우기
+    $("#deletePost").on("click", function () {
+        if (confirm("정말 삭제하시겠습니까?")) {
+            const form = document.createElement("form");
+            form.setAttribute("method", "post");
+            form.setAttribute("action", "./remove");
+
+            const bno = document.createElement("input");
+            bno.setAttribute("type", "hidden");
+            bno.setAttribute("name", "bno");
+            bno.setAttribute("value", [[${board.bno}]]);
+
+            form.appendChild(bno);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+
+    $(function () {
+        const bno = [[${board.bno}]];
+        const commentsArea = $("#commentsArea");
+        const currentUser = [[${#authentication.principal}]];
+        const isAdmin = [[${#authentication.principal.hasAuthorities("ADMIN")}]];
+
+        // 게시글에 달린 댓글 출력
+        function showList() {
+            commentService.getList(
+                bno,
+                function (list) {
+                    let str = "";
+                    if (list == null || list.length == 0) {
+                        commentsArea.html("");
+                        console.log("댓글 없음");
+                    } else {
+                        console.log("There are some replies..");
+
+                        for (let commentlist of list) {
+                            str += `<div class="commentUnit list-group list-group-flush list-group-item">`
+                            //답글이 하나도 없으면 댓글의 border bottom을 제거해야 함
+                            let borderBottom = (commentlist.length == 1) ? "border-bottom-0" : "";
+                            str += `<div class="postComment list-group-item ${borderBottom}">`;
+
+                            // 댓글 출력
+                            let comment = commentlist[0];
+                            if (comment.del) {
+                                str += `<div>삭제된 댓글입니다.</div>`;
+                            } else {
+                                str += `<div class="d-flex">
+                                        <a class="me-auto" href="#">${comment.commentWriterName}</a>`
+                                // 댓글작성자, 어드민 여부에 따른 수정, 삭제 버튼 처리
+                                if (currentUser.mid == comment.mid) {
+                                    str += `<button class="modifyComment btn btn-sm btn-secondary" style="margin-right: 5px">수정</button>
+                                            <button class="removeComment btn btn-sm btn-secondary">삭제</button>`;
+                                } else if (isAdmin) {
+                                    str += `<button class="removeComment btn btn-sm btn-secondary">삭제</button>`;
+                                }
+
+                                // 비밀댓글, 수정 여부 표시
+                                let secretAndEdited = "";
+                                if (comment.secret)
+                                    secretAndEdited += `<span class="isSecret">(비밀댓글입니다)&nbsp</span>`;
+                                if (comment.edited)
+                                    secretAndEdited += `<span class="isEdited">(수정됨)</span>`;
+
+                                str += `</div>
+                                    <div><span class="commentContent" style="white-space: pre-wrap">${comment.commentContent}</span></div>
+                                    <div class="d-flex">
+                                        ${secretAndEdited}
+                                        <button class="btn btn-sm btn-secondary ms-auto showWriteReply">답글</button>
+                                    </div>`
+                            }
+                            str += `<input type="hidden" name="mid" value=${comment.mid}>
+                                    <input type="hidden" name="cno" value=${comment.cno}>
+                                    <input type="hidden" name="secret" value=${comment.secret}>
+                                </div>`;
+
+                            //답글 출력 부분
+                            if (comment != null) {
+                                // 댓글에 대한 답글 입력창
+                                str += `<div class="list-group-item postReply writeReply" style="display: none;">
+                                        <div><b>${comment.commentWriterName}</b>에게 답글 입력</div>
+                                        <div class="d-flex">
+                                            <textarea class="flex-fill" style="margin-right: 10px"></textarea>
+                                            <button class="btn btn-danger align-self-start writeReplyButton">답글 입력</button>
+                                        </div>
+                                    </div>`;
+                            }
+                            for (let i = 1; i < commentlist.length; i++) {
+                                // 마지막 답글의 border-bottom 제거
+                                let borderBottom = (i == commentlist.length - 1) ? "border-bottom-0" : "";
+
+                                str += `<div class="list-group-item postReply ${borderBottom}">
+                                        <div class="d-flex">
+                                            <a class="me-auto" href="#">${commentlist[i].commentWriterName}</a>`;
+                                if (currentUser.mid == commentlist[i].mid) {
+                                    str += `<button class="modifyComment btn btn-sm btn-secondary" style="margin-right: 5px">수정</button>
+                                            <button class="removeComment btn btn-sm btn-secondary">삭제</button>`;
+                                } else if (isAdmin) {
+                                    str += `<button class="removeComment btn btn-sm btn-secondary">삭제</button>`;
+                                }
+
+                                // 답글 수정 여부
+                                let isEdited = "";
+                                if (commentlist[i].edited)
+                                    isEdited += `<span class="isEdited">(수정됨)</span>`;
+
+                                str += `</div>
+                                        <div>
+                                            <span class="replyTarget">${commentlist[i].targetUserName}</span>
+                                            <span class="commentContent" style="white-space: pre-wrap">${commentlist[i].commentContent}</span>
+                                        </div>
+                                        <div class="d-flex">
+                                            ${isEdited}
+                                            <button class="btn btn-sm btn-secondary ms-auto showWriteReply">답글</button>
+                                        </div>
+                                        <input type="hidden" name="mid" value=${commentlist[i].mid}>
+                                        <input type="hidden" name="cno" value=${commentlist[i].cno}>
+                                    </div>`;
+
+                                // 답글에 대한 답글 입력창
+                                str += `<div class="list-group-item postReply writeReply" style="display: none;">
+                                        <div><b>${commentlist[i].commentWriterName}</b>에게 답글 입력</div>
+                                        <div class="d-flex">
+                                            <textarea class="flex-fill" style="margin-right: 10px"></textarea>
+                                            <button class="btn btn-danger align-self-start writeReplyButton">답글 입력</button>
+                                        </div>
+                                    </div>`;
+                            }
+                            str += `</div></div>`;
+                        }
+                    }
+                    // 댓글 입력창
+                    str += `<div class="list-group-item writeReply">
+                                <input id="secret" type="checkbox" class="form-check-input">
+                                <label class="form-check-label" for="secret" style="margin-bottom: 5px;">비밀댓글로 입력</label>
+                                <div class="d-flex">
+                                    <textarea class="flex-fill" style="margin-right: 10px"></textarea>
+                                    <button class="btn btn-danger align-self-start writeCommentButton">댓글 입력</button>
+                                </div>
+                            </div>`;
+
+                    commentsArea.html(str);
+                }
+            );
+        }
+
+        showList();
+
+        // 댓글 내용 길이 체크 함수
+        function checkContentLength(content) {
+            if (!content?.trim()) {
+                alert("댓글 내용을 작성해 주세요.");
+                return false;
+            } else if (content.length > 2000) {
+                alert("댓글 내용은 2000자 이하여야 합니다.");
+                return false;
+            }
+            return true;
+        }
+
+        // 댓글 작성 기능
+        $("#commentsArea").on("click", ".writeCommentButton", function (event) {
+            event.preventDefault();
+
+            // 서버에 전달할 값 설정
+            let textArea = $(this).prev();
+            let commentContent = textArea.val();
+            let secret = $(this).parent().siblings("#secret").first().is(":checked");
+
+            if (!checkContentLength(commentContent))
+                return;
+
+            commentService.add(
+                {bno: bno, commentContent: commentContent, secret: secret},
+                function (result) {
+                    showList();
+                }
+            )
+        });
+
+
+        // 답글 작성 기능
+        $("#commentsArea").on("click", ".writeReplyButton", function (event) {
+            event.preventDefault();
+
+            // 서버에 전달할 값 설정
+            let textArea = $(this).prev();
+            let commentContent = textArea.val();
+            let commentTag = $(this).parent().parent().parent().find(".postComment").first();  // 답글 대상이 되는 댓글
+            let cnoTag = commentTag.find("input[name='cno']").first();
+            let targetCno = cnoTag.val();
+            let secret = cnoTag.next().val();
+            let targetComment = $(this).parent().parent().prev();  // 답글 대상이 되는 댓글 또는 답글
+            let targetMid = targetComment.find("input[name='mid']").val();
+
+            if (!checkContentLength(commentContent))
+                return;
+
+            commentService.add(
+                {bno: bno, commentContent: commentContent, targetCno: targetCno, targetMid: targetMid, secret: secret},
+                function (result) {
+                    showList();
+                }
+            )
+        });
+
+        // 댓글 삭제 기능
+        $("#commentsArea").on("click", ".removeComment", function () {
+            if (confirm("댓글을 삭제하시겠습니까?")) {
+                let cno = $(this).parent().parent().find("input[name='cno']").val();
+                commentService.remove(cno, function (result) {
+                    showList();
+                });
+            }
+        });
+
+        // 댓글 수정 블록 열기
+        $("#commentsArea").on("click", ".modifyComment", function () {
+            let commentBlock = $(this).parent().parent();
+            let commentContent = commentBlock.find(".commentContent").first().text();
+            let cno = commentBlock.find("input[name='cno']").first().val();
+
+            commentBlock.html(`
+                <div>댓글 수정</div>
+                <div class="d-flex">
+                    <textarea class="flex-fill">${commentContent}</textarea>
+                </div>
+                <div class="d-flex justify-content-end" style="margin-top:5px">
+                    <button class="btn btn-danger completeModifying" style="margin-right: 10px">수정</button>
+                    <button class="btn btn-danger cancelModifying">취소</button>
+                </div>
+                <input type="hidden" name="cno" value=${cno}>
+            `);
+
+            // textarea 크기 조정
+            const newTextarea = commentBlock.find("textarea");
+            let computedHeight = newTextarea.prop("scrollHeight");
+            if (computedHeight < DEFAULT_TEXTAREA_HEIGHT)
+                computedHeight = DEFAULT_TEXTAREA_HEIGHT;
+            newTextarea.css("height", computedHeight);
+        });
+
+        // 댓글 수정을 완료하는 버튼을 누른 경우
+        $("#commentsArea").on("click", ".completeModifying", function () {
+            let modifyBlock = $(this).parent().parent();
+            let cno = modifyBlock.find("input[name='cno']").first().val();
+            let content = modifyBlock.find("textarea").val();
+
+            if (!checkContentLength(content))
+                return;
+
+            commentService.update(
+                {cno: cno, commentContent: content},
+                function (result) {
+                    showList();
+                }
+            )
+        });
+
+        // 댓글 수정을 취소할 경우
+        $("#commentsArea").on("click", ".cancelModifying", function () {
+            if (confirm("댓글 수정을 취소하시겠습니까?")) {
+                showList();
+            }
+        });
+
+
+        // 장소 정보를 가져오는 ajax 함수
+        function getPlace(placeId, callback, error) {
+            $.ajax({
+                type: "GET",
+                url: "/getPlace/" + placeId,
+                contentType: "application/json; charset=utf-8",
+                success: callback,
+                error: error
+            });
+        }
+
+        const container = document.getElementById('location'); //지도를 담을 영역의 DOM 레퍼런스
+
+        let placeId = [[${board.placeId}]];
+        if (placeId) {  // placeId가 존재하는 경우만 실행
+            $(container).show();
+            getPlace(placeId, function (placeVO) {
+                let coords = new kakao.maps.Coords(placeVO.x, placeVO.y);
+                let latLng = coords.toLatLng();
+                let options = { //지도를 생성할 때 필요한 기본 옵션
+                    center: latLng, //지도의 중심좌표.
+                    level: 3 //지도의 레벨(확대, 축소 정도)
+                };
+
+                let map = new kakao.maps.Map(container, options); //지도 생성 및 객체 리턴
+
+                // 마커 생성
+                let markerOption = {
+                    position: latLng
+                };
+                let marker = new kakao.maps.Marker(markerOption);
+                marker.setMap(map);
+
+                // 인포윈도우 생성
+                let infoWindowContent = `<div style="white-space: nowrap; padding: 0 10px"><b>${placeVO.placeName}</b>`;
+                if (placeVO.streetAddr) {
+                    infoWindowContent += `<div>${placeVO.streetAddr}</div>`;
+                    infoWindowContent += `<div><span style="color: gray">지번 :&nbsp</span>${placeVO.regionAddr}</div>`;
+                } else {
+                    infoWindowContent += `<div>${placeVO.regionAddr}</div>`;
+                }
+                infoWindowContent += `<a href=${placeVO.pathFindUrl} target="_blank">길찾기</a></div>`
+
+                let infowindow = new kakao.maps.InfoWindow({
+                    map: map,
+                    position: latLng,
+                    content: infoWindowContent
+                });
+                infowindow.open(map, marker);  // 마커 위에 인포윈도우가 함께 뜨도록 하기 위해 필요
+            });
+        }
+    });
+
+</script>
+</html>
