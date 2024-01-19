@@ -45,10 +45,10 @@ add
 alter table
     tbl_school change school_name_kor SCHOOL_NAME_KOR varchar(50)
 
-insert into tbl_school (school_id, school_name)
+insert into tbl_school (school_id, school_name_kor)
 values ("konkuk", "건국대")
 
-insert into tbl_school (school_id, school_name)
+insert into tbl_school (school_id, school_name_kor)
 values ("snu", "서울대")
 
 insert into tbl_school (school_id, school_name_kor)
@@ -85,3 +85,6 @@ create sequence seq_comment nocache;
 5. KAKAO_SECRET : kakao developers -> 내 애플리케이션 -> 카카오 로그인 -> 보안 -> Client secret 에 있는 코드 입력
 
 
+## 프로젝트 실행
+DB, 환경변수 설정을 마친 뒤 Intellij IDEA 등으로 프로젝트를 열고 src\main\java\io\github\aliontory\uni_meeting\UniMeetingApplication.java 를 실행하세요.
+브라우저 주소창에 localhost:10001 을 입력하면 사이트에 들어갈 수 있습니다.
