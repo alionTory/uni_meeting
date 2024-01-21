@@ -84,6 +84,8 @@ create sequence seq_comment nocache;
 4. KAKAO_JAVASCRIPT : kakao developers에서 받은 JavaScript 키
 5. KAKAO_SECRET : kakao developers -> 내 애플리케이션 -> 카카오 로그인 -> 보안 -> Client secret 에 있는 코드 입력
 
+주의 : 환경변수 수정 내용을 적용하려면 Intellij를 다시 시작해야 합니다.
+
 
 ## 프로젝트 실행
 DB, 환경변수 설정을 마친 뒤 Intellij IDEA 등으로 프로젝트를 열고 src\main\java\io\github\aliontory\uni_meeting\UniMeetingApplication.java 를 실행하세요.
